@@ -1,8 +1,11 @@
 import * as Yup from 'yup';
-import { startOfHour, parseISO, isBefore } from 'date-fns';
+import { startOfHour, parseISO, isBefore, format, subHours } from 'date-fns';
+import pt from 'date-fns/locale/pt';
 import User from '../models/User';
 import File from '../models/file';
 import Appointment from '../models/appointment';
+import Notification from '../schemas/notification';
+import Mail from '../../lib/mail';
 
 class AppointmentController {
   // metodo index = listgem
@@ -86,8 +89,56 @@ class AppointmentController {
       date: hourStart,
     });
 
+    // notificar prestador de serviço
+    const user = await User.findByPk(req.userId);
+    const formatedDate = format(hourStart, "'dia' dd 'de' MMMM',às' H:mm'h'", {
+      locale: pt,
+    });
+
+    await Notification.create({
+      content: `Novo agendamento de ${user.nome} para ${formatedDate}`,
+      user: provider_id,
+    });
+
     return res.json(appointment);
   }
-}
+
+  // metodo delete para cancelar um agendamento
+  async delete(req, res) {
+    const appointment = await Appointment.findByPk(req.params.id, {
+      include: [
+        {
+          model: User,
+          as: 'provider',
+          attributes: ['nome', 'email'],
+        },
+      ],
+    });
+
+    if (appointment.user_id !== req.userId) {
+      return res
+        .status(401)
+        .json({ error: 'Agendamento não pertence ao usuário logado' });
+    }
+
+    const dateWithSub = subHours(appointment.date, 2);
+    if (isBefore(dateWithSub, new Date())) {
+      return res
+        .status(401)
+        .json({ error: 'Cancelamento não é possivel, limite 2h exedido' });
+    }
+
+    appointment.canceled_at = new Date();
+    await appointment.save();
+
+    await Mail.sendMail({
+      to: `${appointment.provider.nome}<${appointment.provider.email}>`,
+      subject: 'Agendamento Cancelado',
+      text: 'que pena !!! vocÇe tem um serviço cancelado!',
+    });
+
+    return res.json(appointment);
+  } // end of delete metodo
+} // end of class AppointmentController
 
 export default new AppointmentController();
