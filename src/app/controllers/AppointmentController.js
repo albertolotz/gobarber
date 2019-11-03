@@ -1,11 +1,12 @@
 import * as Yup from 'yup';
 import { startOfHour, parseISO, isBefore, format, subHours } from 'date-fns';
 import pt from 'date-fns/locale/pt';
+import Queue from '../../lib/Queue';
 import User from '../models/User';
 import File from '../models/file';
 import Appointment from '../models/appointment';
 import Notification from '../schemas/notification';
-import Mail from '../../lib/mail';
+import CancellationMail from '../jobs/CancellationMail';
 
 class AppointmentController {
   // metodo index = listgem
@@ -109,6 +110,11 @@ class AppointmentController {
       include: [
         {
           model: User,
+          as: 'user',
+          attributes: ['nome'],
+        },
+        {
+          model: User,
           as: 'provider',
           attributes: ['nome', 'email'],
         },
@@ -130,13 +136,9 @@ class AppointmentController {
 
     appointment.canceled_at = new Date();
     await appointment.save();
-
-    await Mail.sendMail({
-      to: `${appointment.provider.nome}<${appointment.provider.email}>`,
-      subject: 'Agendamento Cancelado',
-      text: 'que pena !!! vocÇe tem um serviço cancelado!',
+    await Queue.add(CancellationMail.key, {
+      appointment,
     });
-
     return res.json(appointment);
   } // end of delete metodo
 } // end of class AppointmentController

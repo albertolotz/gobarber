@@ -34,7 +34,7 @@ class UserController {
 
     // verefica se senha antiga é igual a cadastrada
     if (oldPassword && !(await user.checkPassword(oldPassword))) {
-      return res.status(401).json({ error: 'xxxPassword does not mach.' });
+      return res.status(401).json({ error: 'Password does not mach.' });
     }
 
     // atualiza dados se condições acima estivers falsa.
