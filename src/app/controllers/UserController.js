@@ -1,4 +1,5 @@
 import User from '../models/User';
+import File from '../models/file';
 
 class UserController {
   async store(req, res) {
@@ -21,7 +22,6 @@ class UserController {
     const { email, oldPassword } = req.body;
 
     const user = await User.findByPk(req.userId);
-    console.log(user);
 
     // confirma se email existe
     if (email !== user.email) {
@@ -38,13 +38,23 @@ class UserController {
     }
 
     // atualiza dados se condições acima estivers falsa.
-    const { id, nome, provider } = await user.update(req.body);
+    await user.update(req.body);
+
+    const { id, nome, avatar } = await User.findByPk(req.userId, {
+      include: [
+        {
+          model: File,
+          as: 'avatar',
+          attributes: ['id', 'path', 'url'],
+        },
+      ],
+    });
 
     return res.json({
       id,
       nome,
       email,
-      provider,
+      avatar,
     });
   }
 }
